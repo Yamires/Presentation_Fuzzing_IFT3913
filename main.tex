@@ -1,0 +1,247 @@
+\documentclass[10pt]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{listings}
+\usepackage{bera} % police pour listings
+
+% Bibliographie
+
+% Liens cliquables et macro pour sources en bas de slide
+\usepackage{tikz}
+
+\usepackage{hyperref}
+\newcommand{\sourceline}[1]{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=south east, xshift=-0.2cm, yshift=0.5cm] at (current page.south east) {%
+      \scriptsize\textit{Source:}~\href{#1}{\texttt{#1}}};
+  \end{tikzpicture}%
+}
+
+
+% Thème Beamer
+\usetheme{Madrid}
+
+
+\title{Test par Fuzzing}
+\author{Yamir Alejandro Poldo Silva}
+\date{2 Octobre 2025}
+
+\begin{document}
+
+% Page de titre
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Plan de la présentation}
+\tableofcontents
+\end{frame}
+
+% Introduction
+\section{Introduction}
+\begin{frame}{Introduction}
+\begin{itemize}
+  \item Les tests unitaires sont essentiels mais limités.
+  \item Même avec de bons tests unitaires, des failles critiques peuvent exister.
+  \item Le \textbf{fuzzing} comble ce vide en injectant massivement des données.
+\end{itemize}
+\end{frame}
+
+% Définition
+\section{Définition}
+\begin{frame}{Définition du fuzzing}
+\begin{block}{Définition}
+Fuzzing (ou fuzz testing) est une technique de test automatisée qui consiste à fournir massivement \textbf{des entrées aléatoires, corrompues ou spécialement construites} à un programme afin d’observer son comportement et déceler des erreurs \textbf{(crashs, fuites mémoire, exceptions, réponses anormales)}.
+
+\sourceline{https://github.com/resources/articles/security/what-is-fuzz-testing}
+\end{block}
+\end{frame}
+
+
+
+% Génération des données
+\section{La génération de donnée}
+\begin{frame}{Génération des données}
+Deux grandes approches :
+\begin{itemize}
+    \item \textbf{Génération} : produire des entrées à partir de modèles/grammaires (JSON, protocoles...).
+    \item \textbf{Mutation} : modifier une entrée valide (seed).
+\end{itemize}
+\sourceline{https://github.com/resources/articles/security/what-is-fuzz-testing}
+\end{frame}
+
+\begin{frame}[fragile]{Exemple : génération basée sur une grammaire}
+\begin{block}{Une grammaire}
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
+<start>   ::= <expr>
+<expr>    ::= <term> + <expr> | <term> - <expr> | <term>
+<term>    ::= <term> * <factor> | <term> / <factor> | <factor>
+<factor>  ::= +<factor> | -<factor> | (<expr>) | <integer>
+<integer> ::= <digit><integer> | <digit>
+<digit>   ::= 0|1|2|3|4|5|6|7|8|9
+\end{lstlisting}
+\end{block}
+
+\begin{itemize}
+  \item Exemples générés : \texttt{(1+2)*3}, \texttt{4/(2-1)}, \texttt{12+34*5}, \texttt{-(3+4)}
+\end{itemize}
+
+\vspace{1mm}
+\sourceline{https://www.fuzzingbook.org/html/Grammars.html}
+\end{frame}
+
+
+% Exemple Radamsa
+\begin{frame}[fragile]{Exemple avec Radamsa (mutation)}
+\begin{block}{Principe}
+Radamsa prend une entrée valide et génère plusieurs variantes corrompues.
+\end{block}
+
+\begin{lstlisting}[language=bash, frame=single]
+$ echo "1 + (2 + ( 3 + 4))" | radamsa --seed 12 -n 4
+1 + (2 + (2 + (3 + 4?))
+1 + (2 + (3 + ?4))
+18446744073709551615 + 4)))
+1 + (2 + (3 + 170141183460469231731687303715884105727))
+\end{lstlisting}
+
+\begin{itemize}  
+  \item Le fuzzer explore ainsi des cas non anticipés (valeurs extrêmes, caractères inattendus).  
+\end{itemize}
+
+\sourceline{https://gitlab.com/akihe/radamsa}
+
+\end{frame}
+
+
+% Types de fuzzing
+\section{Les principales approches}
+\begin{frame}{Les principales approches}
+\begin{itemize}
+  \item \textbf{Boîte noire} : aucune connaissance du fonctionnement interne du programme, génération d'entrée aléatoires.
+  \item \textbf{Boîte blanche} : accès au code source, génération d’entrées spécifiques.
+  \item \textbf{Boîte grise} : Connaissances partielles du système.
+  \item \textbf{Guidée par la couverture} : Génération et priorisation des entrées qui augmente la couverture du code. 
+\end{itemize}
+\sourceline{https://github.com/resources/articles/security/what-is-fuzz-testing}
+\end{frame}
+
+
+% Cycle de fonctionnement
+\section{Cycle de fonctionnement}
+\begin{frame}{Cycle de fonctionnement d’un fuzzer}
+\begin{enumerate}
+  \item Définir les objectifs et la portée. \textbf{Les systèmes testés doivent accepter une entrée}.
+  \item Choisir l\’ outil selon les contraintes de tests et langage de programmation.
+  \item Générer ou muter des entrées et les injecter dans la cible.
+  \item Observer et enregistrer les anomalies \textbf{(plantage, fuites de mémoires, buffer overflows, exceptions, et autres comportements inattendues)}
+  \item Corriger les erreurs à partir du rapport généré et relancer la campagne de fuzzing.
+\end{enumerate}
+
+\sourceline{https://github.com/resources/articles/security/what-is-fuzz-testing}
+\end{frame}
+
+% Outils
+\section{Quelques outils de fuzzing}
+\begin{frame}{Outils de fuzzing}
+\begin{itemize}
+  \item \textbf{AFL / AFL++} — fuzzer basé sur la couverture.
+  \item \textbf{Jazzer} — fuzzer basé sur la couverture pour la JVM / applications Java et Kotlin.
+  \item \textbf{OSS-Fuzz} — service de fuzzing continu (Google).
+  \item \textbf{Radamsa} — outil de \emph{mutation} simple.
+  \item \textbf{FFUF (Fuzz Faster U Fool)} — fuzzer léger orienté applications web / URL discovery (Go). Laboratoire en ligne \url{ffuf.me}
+\end{itemize}
+\sourceline{https://github.com/secfigo/Awesome-Fuzzing?tab=readme-ov-file#tools}
+
+\end{frame}
+
+\section{Exemple de Fuzzer minimaliste}
+\begin{frame}[fragile]
+\frametitle{Exemple : FFUF + Radamsa}
+
+\begin{lstlisting}[language=bash, basicstyle=\small\ttfamily, frame=single]
+# Generer 1000 mutations avec Radamsa
+$ echo '{"user":"admin","email":"test@example.com"}' | \
+  radamsa --seed 42 -n 1000 > payloads.txt
+
+# Fuzzer l'endpoint avec FFUF
+$ ffuf -u https://httpbin.org/post \
+       -X POST \
+       -H "Content-Type: application/json" \
+       -d FUZZ \
+       -w payloads.txt \
+       -mc all \
+       -t 10 \
+       -maxtime 60
+\end{lstlisting}
+
+\end{frame}
+
+
+% Limites
+\section{Bénéfices et limites}
+\begin{frame}{Bénéfices et limites}
+\begin{itemize}
+  \item Découverte de bugs inattendus (même dans du code déjà testé)
+  \item Améliore la robustesse et la sécurité logicielle
+  \item Complément aux tests unitaires et analyses statiques
+  \item Efficace par rapport aux tests manuels et humains. 
+\end{itemize}
+\pause
+\begin{block}{Limites}
+\begin{itemize}
+  \item Ne couvre pas toutes les voies d’exécution
+  \item Bugs parfois difficiles à analyser ou reproduire
+  \item Peut être non-déterministe 
+  \item Coût élevé en ressources et temps 
+\end{itemize}
+\end{block}
+\sourceline{https://github.com/resources/articles/security/what-is-fuzz-testing}
+\end{frame}
+
+
+% Conclusion (version condensée)
+\section{Conclusion}
+\begin{frame}{Conclusion}
+\begin{itemize}
+  \item Important que bien de connaître le système testé
+  \item Complémentaire aux autres tests et aux bonnes pratiques
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Sources principales}
+\footnotesize
+\begin{thebibliography}{9}
+
+\bibitem{github}
+GitHub Security Lab. 
+\newblock \emph{What is fuzz testing?}  
+\newblock  \url{https://github.com/resources/articles/security/what-is-fuzz-testing} (consulté le 1 octobre 2025).
+
+\bibitem{fuzzingbook}
+Zeller, A. et al.  
+\newblock \emph{The Fuzzing Book}.  
+\newblock \url{https://www.fuzzingbook.org/} (consulté le 20 septembre 2025).
+
+\bibitem{radamsa}
+Helin, A.  
+\newblock \emph{Radamsa Fuzzer}.  
+\newblock \url{https://gitlab.com/akihe/radamsa} (consulté le 20 septembre 2025).
+
+\bibitem{antithesis}
+Antithesis.  
+\newblock \emph{SDTalk Blog Post (Mario Bros Example)}.  
+\newblock \url{https://antithesis.com/blog/sdtalk/} (consulté le 29 septembre 2025).
+
+\bibitem{ossfuzz}
+Google.  
+\newblock \emph{OSS-Fuzz}.  
+\newblock  \url{https://oss-fuzz.com} (consulté le 29 septembre 2025).
+
+\end{thebibliography}
+\end{frame}
+
+
+
+\end{document}
